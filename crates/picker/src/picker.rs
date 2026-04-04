@@ -137,6 +137,7 @@ pub struct Picker<D: PickerDelegate> {
     /// the picker has a preview; see [`Picker::initial_width`] / [`Picker::max_height`].
     default_shape: shape::Centered,
     size_bounds: shape::SizeBounds,
+    visible_range: Range<usize>,
     /// An external control to display a scrollbar in the `Picker`.
     show_scrollbar: bool,
     /// How the picker is presented, which controls its chrome and behavior.
@@ -639,6 +640,7 @@ impl<D: PickerDelegate> Picker<D> {
             presentation: Presentation::Modal {
                 resizable: has_preview,
             },
+            visible_range: 0..0,
             picker_bounds: Rc::new(Cell::new(None)),
             item_bounds: Rc::new(RefCell::new(HashMap::default())),
             size_bounds,
@@ -974,6 +976,64 @@ impl<D: PickerDelegate> Picker<D> {
         let count = self.delegate.match_count();
         if count > 0 {
             self.set_selected_index(count - 1, Some(Direction::Up), true, window, cx);
+            cx.notify();
+        }
+    }
+
+    fn select_prev_page(
+        &mut self,
+        _: &menu::SelectPrevPage,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let count = self.delegate.match_count();
+
+        if count > 0 {
+            let current_index = self.delegate.selected_index();
+            let page_start = self.visible_range.start;
+
+            if current_index > page_start {
+                // First press: jump to the first visible item on the current page
+                self.set_selected_index(page_start, Some(Direction::Down), true, window, cx);
+            } else {
+                // Already at or before the page boundary: scroll up a full page
+                let page_size = self.visible_range.len().max(1);
+                let scroll_target = page_start.saturating_sub(page_size);
+                self.scroll_item_index_to_top(scroll_target);
+                self.set_selected_index(scroll_target, Some(Direction::Down), false, window, cx);
+            }
+            cx.notify();
+        }
+    }
+
+    fn select_next_page(
+        &mut self,
+        _: &menu::SelectNextPage,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let count = self.delegate.match_count();
+
+        if count > 0 {
+            let current_index = self.delegate.selected_index();
+            let page_end = self.visible_range.end.saturating_sub(1).min(count - 1);
+
+            if current_index < page_end {
+                // First press: jump to the last visible item on the current page
+                self.set_selected_index(page_end, Some(Direction::Up), true, window, cx);
+            } else {
+                // Already at or past the page boundary: scroll down a full page
+                let page_size = self.visible_range.len().max(1);
+                let scroll_target = self.visible_range.end.min(count - 1);
+                self.scroll_item_index_to_top(scroll_target);
+                self.set_selected_index(
+                    (current_index + page_size).min(count - 1),
+                    Some(Direction::Down),
+                    false,
+                    window,
+                    cx,
+                );
+            }
             cx.notify();
         }
     }
@@ -1350,6 +1410,18 @@ impl<D: PickerDelegate> Picker<D> {
         }
     }
 
+    fn scroll_item_index_to_top(&mut self, ix: usize) {
+        match &mut self.element_container {
+            ElementContainer::List(state) => state.scroll_to(gpui::ListOffset {
+                item_ix: ix,
+                offset_in_item: px(0.0),
+            }),
+            ElementContainer::UniformList(scroll_handle) => {
+                scroll_handle.scroll_to_item(ix, ScrollStrategy::Top)
+            }
+        }
+    }
+
     fn render_element(
         &self,
         window: &mut Window,
@@ -1527,6 +1599,7 @@ impl<D: PickerDelegate> Picker<D> {
                 "candidates",
                 self.delegate.match_count(),
                 cx.processor(move |picker, visible_range: Range<usize>, window, cx| {
+                    picker.visible_range = visible_range.clone();
                     visible_range
                         .map(|ix| picker.render_element(window, cx, ix))
                         .collect()
