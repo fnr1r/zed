@@ -2130,6 +2130,58 @@ mod tests {
             );
         });
     }
+
+    #[gpui::test]
+    async fn test_prev_page_jumps_to_page_start(cx: &mut TestAppContext) {
+        init_test(cx);
+
+        let (picker, cx) = cx.add_window_view(|window, cx| {
+            Picker::uniform_list(TestDelegate::new(vec![true; 30]), window, cx)
+        });
+
+        picker.update_in(cx, |picker, window, cx| {
+            picker.set_selected_index(29, Some(Direction::Up), false, window, cx);
+            picker.visible_range = 20..30;
+            picker.select_prev_page(&menu::SelectPrevPage, window, cx);
+        });
+
+        picker.update(cx, |picker, _cx| {
+            assert_eq!(picker.delegate.selected_index(), 20);
+        });
+
+        picker.update_in(cx, |picker, window, cx| {
+            picker.visible_range = 20..30;
+            picker.select_prev_page(&menu::SelectPrevPage, window, cx);
+        });
+        picker.update(cx, |picker, _cx| {
+            assert_eq!(picker.delegate.selected_index(), 10);
+        });
+    }
+
+    #[gpui::test]
+    async fn test_next_page_jumps_to_page_end(cx: &mut TestAppContext) {
+        init_test(cx);
+
+        let (picker, cx) = cx.add_window_view(|window, cx| {
+            Picker::uniform_list(TestDelegate::new(vec![true; 20]), window, cx)
+        });
+
+        picker.update_in(cx, |picker, window, cx| {
+            picker.visible_range = 0..17;
+            picker.select_next_page(&menu::SelectNextPage, window, cx);
+        });
+        picker.update(cx, |picker, _cx| {
+            assert_eq!(picker.delegate.selected_index(), 16);
+        });
+
+        picker.update_in(cx, |picker, window, cx| {
+            picker.visible_range = 0..17;
+            picker.select_next_page(&menu::SelectNextPage, window, cx);
+        });
+        picker.update(cx, |picker, _cx| {
+            assert_eq!(picker.delegate.selected_index(), 19);
+        });
+    }
 }
 
 impl<D: PickerDelegate> EventEmitter<DismissEvent> for Picker<D> {}
