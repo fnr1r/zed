@@ -897,8 +897,10 @@
       "up": "editor::ContextMenuPrevious",
       "ctrl-n": "editor::ContextMenuNext",
       "down": "editor::ContextMenuNext",
-      "pageup": "editor::ContextMenuFirst",
-      "pagedown": "editor::ContextMenuLast",
+      "pageup": "editor::ContextMenuPageUp",
+      "home": "editor::ContextMenuFirst",
+      "pagedown": "editor::ContextMenuPageDown",
+      "end": "editor::ContextMenuLast",
     },
   },
   {

@@ -8078,6 +8078,17 @@ impl Editor {
         }
     }
 
+    pub fn context_menu_page_up(
+        &mut self,
+        _: &ContextMenuPageUp,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(context_menu) = self.context_menu.borrow_mut().as_mut() {
+            context_menu.select_page_up(self.completion_provider.as_deref(), window, cx);
+        }
+    }
+
     pub fn context_menu_prev(
         &mut self,
         _: &ContextMenuPrevious,
@@ -8097,6 +8108,17 @@ impl Editor {
     ) {
         if let Some(context_menu) = self.context_menu.borrow_mut().as_mut() {
             context_menu.select_next(self.completion_provider.as_deref(), window, cx);
+        }
+    }
+
+    pub fn context_menu_page_down(
+        &mut self,
+        _: &ContextMenuPageDown,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(context_menu) = self.context_menu.borrow_mut().as_mut() {
+            context_menu.select_page_down(self.completion_provider.as_deref(), window, cx);
         }
     }
 

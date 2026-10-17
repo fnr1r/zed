@@ -111,6 +111,26 @@ impl CodeContextMenu {
         }
     }
 
+    pub fn select_page_up(
+        &mut self,
+        provider: Option<&dyn CompletionProvider>,
+        window: &mut Window,
+        cx: &mut Context<Editor>,
+    ) -> bool {
+        if self.visible() {
+            match self {
+                CodeContextMenu::Completions(menu) => menu.select_page_up(provider, window, cx),
+                CodeContextMenu::CodeActions(_menu) => {
+                    log::warn!("unimplemented");
+                    return false;
+                }
+            }
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn select_prev(
         &mut self,
         provider: Option<&dyn CompletionProvider>,
@@ -138,6 +158,26 @@ impl CodeContextMenu {
             match self {
                 CodeContextMenu::Completions(menu) => menu.select_next(provider, window, cx),
                 CodeContextMenu::CodeActions(menu) => menu.select_next(cx),
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn select_page_down(
+        &mut self,
+        provider: Option<&dyn CompletionProvider>,
+        window: &mut Window,
+        cx: &mut Context<Editor>,
+    ) -> bool {
+        if self.visible() {
+            match self {
+                CodeContextMenu::Completions(menu) => menu.select_page_down(provider, window, cx),
+                CodeContextMenu::CodeActions(_menu) => {
+                    log::warn!("unimplemented");
+                    return false;
+                }
             }
             true
         } else {
@@ -272,6 +312,8 @@ pub struct CompletionsMenu {
     language: Option<LanguageName>,
     display_options: CompletionDisplayOptions,
     snippet_sort_order: SnippetSortOrder,
+    page_size_lines: RefCell<Option<u32>>,
+    last_page_btn_was_up: RefCell<Option<bool>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -400,6 +442,8 @@ impl CompletionsMenu {
             language,
             display_options,
             snippet_sort_order,
+            page_size_lines: RefCell::new(None),
+            last_page_btn_was_up: RefCell::new(None),
         };
 
         completions_menu.start_markdown_parse_for_nearby_entries(cx);
@@ -481,6 +525,8 @@ impl CompletionsMenu {
             language: None,
             display_options: CompletionDisplayOptions::default(),
             snippet_sort_order,
+            page_size_lines: RefCell::new(None),
+            last_page_btn_was_up: RefCell::new(None),
         }
     }
 
@@ -524,6 +570,72 @@ impl CompletionsMenu {
         drop(entries);
         let index = self.find_selectable_entry(start, self.scroll_handle.y_flipped());
         if let Some(index) = index {
+            self.update_selection_index(index, provider, window, cx);
+        }
+    }
+
+    fn xxpage_idx<T>(
+        &self,
+        btn_is_up: bool,
+        fn1: impl FnOnce(usize, usize) -> T,
+        fn2: impl FnOnce(T) -> T,
+        fn3: impl FnOnce(T) -> usize,
+    ) -> Option<usize> {
+        let xp = self.page_size_lines.borrow();
+        let Some(page_size_lines) = xp.as_ref().and_then(|e| usize::try_from(*e).ok()) else {
+            return None;
+        };
+        let mut last_page_btn_was_up = self.last_page_btn_was_up.borrow_mut();
+        let selected = self.selected_item;
+        let mut res = fn1(selected, page_size_lines);
+        if *last_page_btn_was_up != Some(btn_is_up) {
+            *last_page_btn_was_up = Some(btn_is_up);
+            res = fn2(res);
+        }
+        Some(fn3(res))
+    }
+
+    fn xpage_idx(&self, forward: bool) -> Option<usize> {
+        // last rendered range is unreliable. we use what we can
+        let entries = self.entries.borrow();
+        if entries.is_empty() {
+            return None;
+        }
+        if forward {
+            self.xxpage_idx(
+                true,
+                |selected, page_size_lines| selected.checked_add(page_size_lines),
+                |e| Some(e.map_or(entries.len(), |e| e.saturating_sub(1))),
+                |e| e.map_or(entries.len() - 1, |e| e.min(entries.len() - 1)),
+            )
+        } else {
+            self.xxpage_idx(
+                false,
+                |selected, page_size_lines| selected.checked_sub(page_size_lines),
+                |e| Some(e.map_or(0, |e| e.saturating_add(1))),
+                |e| e.unwrap_or_default(),
+            )
+        }
+    }
+
+    fn select_page_up(
+        &mut self,
+        provider: Option<&dyn CompletionProvider>,
+        window: &mut Window,
+        cx: &mut Context<Editor>,
+    ) {
+        if let Some(index) = self.xpage_idx(self.scroll_handle.y_flipped()) {
+            self.update_selection_index(index, provider, window, cx);
+        }
+    }
+
+    fn select_page_down(
+        &mut self,
+        provider: Option<&dyn CompletionProvider>,
+        window: &mut Window,
+        cx: &mut Context<Editor>,
+    ) {
+        if let Some(index) = self.xpage_idx(!self.scroll_handle.y_flipped()) {
             self.update_selection_index(index, provider, window, cx);
         }
     }
@@ -916,6 +1028,7 @@ impl CompletionsMenu {
         window: &mut Window,
         cx: &mut Context<Editor>,
     ) -> AnyElement {
+        *self.page_size_lines.borrow_mut() = Some(max_height_in_lines);
         let show_completion_documentation = self.show_completion_documentation;
         let editor_settings = EditorSettings::get_global(cx);
         let completion_detail_alignment = editor_settings.completion_detail_alignment;

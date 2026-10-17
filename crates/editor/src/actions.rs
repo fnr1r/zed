@@ -459,6 +459,8 @@ actions!(
         ContextMenuFirst,
         /// Navigates to the last item in the context menu.
         ContextMenuLast,
+        ContextMenuPageUp,
+        ContextMenuPageDown,
         /// Navigates to the next item in the context menu.
         ContextMenuNext,
         /// Navigates to the previous item in the context menu.
