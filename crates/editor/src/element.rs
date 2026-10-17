@@ -690,8 +690,10 @@ impl EditorElement {
         register_action(editor, window, Editor::signature_help_next);
         register_action(editor, window, Editor::show_edit_prediction);
         register_action(editor, window, Editor::context_menu_first);
+        register_action(editor, window, Editor::context_menu_page_up);
         register_action(editor, window, Editor::context_menu_prev);
         register_action(editor, window, Editor::context_menu_next);
+        register_action(editor, window, Editor::context_menu_page_down);
         register_action(editor, window, Editor::context_menu_last);
         register_action(editor, window, Editor::display_cursor_names);
         register_action(editor, window, Editor::open_active_item_in_terminal);
